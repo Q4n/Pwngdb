@@ -125,6 +125,16 @@ class PwnCmd(object):
         (addr,) = normalize_argv(arg,1)
         testfsop(addr) 
 
+    def base(self):
+        print("========== bases ==========")
+        self.codebase()
+        self.heapbase()
+        self.libc()
+        self.ld()
+        print("========== struct and values ==========")
+        self.tls()
+        self.canary()
+
     def magic(self):
         """ Print usefual variables or function in glibc """
         getarch()
@@ -235,7 +245,19 @@ class PwnCmd(object):
                     cmd = "b*" + hex(addr)
                     print(gdb.execute(cmd,to_string=True))
 
-    def boff(self,*arg):
+    def blo(self,*arg):
+        """ Set the breakpoint at some offset from libcbase address """
+        (sym,) = normalize_argv(arg,1)
+        libcbaseaddr = libcbase()
+        if sym not in self.bpoff:
+            self.bpoff.append(sym)
+        cmd = "b*" + hex(libcbaseaddr + sym)
+        x = gdb.execute(cmd,to_string=True)
+        y = x.rstrip().split("\n")[-1].split()[1]
+        self.prevbp.append(y)
+        print(x.rstrip())
+
+    def bo(self,*arg):
         """ Set the breakpoint at some offset from base address """
         (sym,) = normalize_argv(arg,1)
         codebaseaddr,codeend = codeaddr()
@@ -247,14 +269,14 @@ class PwnCmd(object):
         self.prevbp.append(y)
         print(x.rstrip())
 
-    def tboff(self,*arg):
+    def tbo(self,*arg):
         """ Set temporary breakpoint at some offset from base address """
         (sym,) = normalize_argv(arg,1)
         codebaseaddr,codeend = codeaddr()
         cmd = "tb*" + hex(codebaseaddr + sym)
         print(gdb.execute(cmd,to_string=True))
 
-    def atboff(self,*arg):
+    def atbo(self,*arg):
         """ Attach and set breakpoints accordingly """
         (sym,) = normalize_argv(arg,1)
         cmd = "attach " + str(sym)
@@ -266,7 +288,7 @@ class PwnCmd(object):
             gdb.execute(cmd,to_string=True)
             x -= 1
         for i in self.bpoff:
-            self.boff(hex(i))
+            self.bo(hex(i))
 
     def doff(self,*arg):
         """ Delete the breakpoint using breakpoint number at some offset from base address """
@@ -290,6 +312,26 @@ class PwnCmd(object):
             codebaseaddr,_ = codeaddr()
             cmd += hex(codebaseaddr + arg1)
         print(gdb.execute(cmd,to_string=True)[:-1])
+
+    def xlo(self,*arg):
+        """ Examine at offset from base address """
+        (_,arg1,) = normalize_argv(arg,2)
+        cmd = "x" + arg[0] + " "
+        if arg1:
+            libcbaseaddr = libcbase()
+            cmd += hex(libcbaseaddr + arg1)
+        print(gdb.execute(cmd,to_string=True)[:-1])
+
+    def one_gadget(self,*arg):
+        ''' Using onegadget to collect gadget'''
+        if len(arg)!=0:
+            (level,) = normalize_argv(arg,1)
+        else:
+            level=0
+        infomap=procmap()
+        data = re.search(".*libc.*\.so",infomap)
+        libcname=data.group().split(' ')[-1]
+        subprocess.call("one_gadget -l "+str(level)+" "+libcname,shell=True)
 
 class PwngdbCmd(gdb.Command):
     """ Pwngdb command wrapper """

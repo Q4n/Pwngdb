@@ -68,9 +68,10 @@ class AngelHeapCmd(object):
         """ Print the inuse chunk """
         angelheap.putinused()
 
-    def parseheap(self):
+    def parseheap(self,*arg):
         """ Parse heap """
-        angelheap.parse_heap()
+        (arena,) = normalize_argv(arg,1)
+        angelheap.parse_heap(arena)
 
     def fakefast(self,*arg):
         (addr,size) = normalize_argv(arg,2)
